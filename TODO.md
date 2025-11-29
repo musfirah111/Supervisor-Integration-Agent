@@ -45,6 +45,6 @@
 
   - Keep current agent names/endpoints; add health status visualization and timeout tuning per agent.
 
-- Zaim's agent will maintain data for all
+- Knowledge Base agent will maintain data for all
 
 google/gemini-2.5-flash-lite

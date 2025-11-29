@@ -84,6 +84,18 @@ def plan_tools_with_llm(query: str, registry: List[AgentMetadata], history: Opti
                 )
             ]
         )
+    # Check for summarization BEFORE deadline/risk to avoid misrouting
+    if any(keyword in lower_q for keyword in ["summary", "summarize", "condense"]):
+        return Plan(
+            steps=[
+                PlanStep(
+                    step_id=0,
+                    agent="document_summarizer_agent",
+                    intent="summary.create",
+                    input_source="user_query",
+                )
+            ]
+        )
     if any(keyword in lower_q for keyword in ["deadline", "due date", "risk", "slip"]):
         return Plan(
             steps=[
@@ -146,17 +158,6 @@ def plan_tools_with_llm(query: str, registry: List[AgentMetadata], history: Opti
                     step_id=0,
                     agent="progress_accountability_agent",
                     intent="progress.track",
-                    input_source="user_query",
-                )
-            ]
-        )
-    if any(keyword in lower_q for keyword in ["summary", "summarize", "condense"]):
-        return Plan(
-            steps=[
-                PlanStep(
-                    step_id=0,
-                    agent="document_summarizer_agent",
-                    intent="summary.create",
                     input_source="user_query",
                 )
             ]

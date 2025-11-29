@@ -30,13 +30,14 @@ def load_registry() -> List[AgentMetadata]:
         ),
         AgentMetadata(
             name="document_summarizer_agent",
-            description="Summarizes documents or text into concise summaries.",
-            intents=["summary.create"],
+            description="Summarizes documents or text into concise summaries. Supports PDF, DOCX, TXT, and Markdown formats. Can extract key points, identify risks, and extract action items.",
+            intents=["summary.create", "summarize_document", "summarize_text", "extract_key_points", "identify_risks", "extract_action_items"],
             type="http",
-            endpoint="https://example.com/summarizer/handle",
-            healthcheck="https://example.com/summarizer/health",
+            endpoint="http://5.161.59.136:8000/api/agent/execute",
+            healthcheck="http://5.161.59.136:8000/health",
+            timeout_ms=30000,
         ),
-       AgentMetadata(
+        AgentMetadata(
             name="meeting_followup_agent",
             description="ONLY for meeting transcripts: extracts action items (with assignees and deadlines), generates meeting summaries, identifies follow-up tasks. Use ONLY when query mentions meetings, transcripts, standups, action items, or follow-ups.",
             intents=["meeting.followup", "meeting.process", "meeting.analyze", "action_items.extract"],
