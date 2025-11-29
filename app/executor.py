@@ -42,6 +42,7 @@ async def execute_plan(
     for step in plan.steps:
         agent_meta = find_agent_by_name(step.agent, registry)
         text = resolve_input(step.input_source, query, step_outputs)
+        # Pass file uploads from context to agent caller
         response = await call_agent(agent_meta, step.intent, text, context)
         step_outputs[step.step_id] = response
         used_agents.append(

@@ -10,6 +10,8 @@ from typing import Dict
 
 from fastapi import FastAPI, HTTPException
 import logging
+import re 
+import base64
 
 from .answer import compose_final_answer
 from .conversation import append_turn, get_history
@@ -51,16 +53,36 @@ def build_app() -> FastAPI:
         conversation_id = payload.conversation_id or str(uuid.uuid4())
         history = get_history(conversation_id)
 
-        plan = plan_tools_with_llm(payload.query, registry, history=history)
+        file_uploads = []
+        query_text = payload.query
+        file_pattern = r'\[FILE_UPLOAD:([^:]+):([^:]+):([^\]]+)\]'
+        matches = re.findall(file_pattern, query_text)
+        
+        for data_url, filename, mime_type in matches:
+            # Extract base64 data from data URL
+            if data_url.startswith('data:'):
+                base64_data = data_url.split(',')[1] if ',' in data_url else data_url
+            else:
+                base64_data = data_url
+            file_uploads.append({
+                'base64_data': base64_data,
+                'filename': filename,
+                'mime_type': mime_type
+            })
+            # Remove file upload markers from query text
+            query_text = re.sub(file_pattern, f'[Uploaded file: {filename}]', query_text)
+
+        plan = plan_tools_with_llm(query_text, registry, history=history)
 
         # Normalize context values to strings to satisfy downstream agents.
         context = {
             "user_id": str(payload.user_id) if payload.user_id is not None else "anonymous",
             "conversation_id": conversation_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "file_uploads": file_uploads,  # Pass file uploads to executor
         }
 
-        step_outputs, used_agents = await execute_plan(payload.query, plan, registry, context)
+        step_outputs, used_agents = await execute_plan(query_text, plan, registry, context)
         answer = compose_final_answer(payload.query, step_outputs, history=history)
 
         intermediate_results = {f"step_{sid}": step_outputs[sid].dict() for sid in step_outputs}

@@ -30,11 +30,22 @@ async def call_agent(
     """
 
     request_id = str(uuid.uuid4())
+    
+    # Build metadata with file uploads if available
+    metadata = {"language": "en", "extra": {}}
+    file_uploads = context.get("file_uploads", [])
+    if file_uploads and len(file_uploads) > 0:
+        # For document summarizer agent, send first file as base64 in metadata
+        first_file = file_uploads[0]
+        metadata["file_base64"] = first_file.get("base64_data", "")
+        metadata["mime_type"] = first_file.get("mime_type", "application/octet-stream")
+        metadata["filename"] = first_file.get("filename", "uploaded_file")
+    
     handshake = AgentRequest(
         request_id=request_id,
         agent_name=agent_meta.name,
         intent=intent,
-        input={"text": text, "metadata": {"language": "en", "extra": {}}},
+        input={"text": text, "metadata": metadata},
         context=context,
     )
 

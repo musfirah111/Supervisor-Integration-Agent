@@ -357,14 +357,42 @@ def render_home() -> HTMLResponse:
                 setFileName('');
               };
               
-              // Read as text for text files, or try to read as text for other files
-              if (file.type.startsWith('text/') || file.name.endsWith('.txt') || file.name.endsWith('.md') || 
-                  file.name.endsWith('.json') || file.name.endsWith('.csv') || file.name.endsWith('.log')) {
+              // Determine file type and MIME type
+              const isTextFile = file.type.startsWith('text/') || 
+                                 file.name.endsWith('.txt') || 
+                                 file.name.endsWith('.md') || 
+                                 file.name.endsWith('.json') || 
+                                 file.name.endsWith('.csv') || 
+                                 file.name.endsWith('.log');
+              
+              const isPDF = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+              const isDOCX = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+                            file.name.endsWith('.docx');
+              
+              if (isTextFile) {
+                // Read text files as text
                 reader.readAsText(file);
+              } else if (isPDF || isDOCX) {
+                // For PDF/DOCX, convert to base64 data URL and embed in query
+                reader.onload = (event) => {
+                  const base64 = event.target.result.split(',')[1]; // Remove data URL prefix
+                  const mimeType = isPDF ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                  const dataUrl = `data:${mimeType};base64,${base64}`;
+                  
+                  // Embed file info in query using special format that supervisor can parse
+                  const fileInfo = `[FILE_UPLOAD:${dataUrl}:${file.name}:${mimeType}]`;
+                  if (!query.trim() || query === 'Summarize our project status and flag any deadline risks.') {
+                    setQuery(`Summarize this document: ${fileInfo}`);
+                  } else {
+                    setQuery(`${query}\n\n${fileInfo}`);
+                  }
+                  setStatus('');
+                };
+                reader.readAsDataURL(file);
               } else {
-                // For binary files like PDF, DOCX, show a message
+                // For other binary files, show error
                 setStatus('');
-                setError({ message: `File type ${file.type || 'unknown'} not supported for direct text reading. Please use the document URL feature or paste the content manually.`, type: 'file_error' });
+                setError({ message: `File type ${file.type || 'unknown'} not supported. Supported: text files, PDF, DOCX.`, type: 'file_error' });
                 setFileName('');
               }
             };
@@ -403,8 +431,8 @@ def render_home() -> HTMLResponse:
                   <textarea value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Type your question here or upload a file..." />
                   <div style={{ marginTop: 8, marginBottom: 8 }}>
                     <label style={{ display: 'inline-block', cursor: 'pointer', fontSize: '13px', color: 'var(--muted)' }}>
-                      <input type="file" onChange={handleFileUpload} accept=".txt,.md,.json,.csv,.log,text/*" style={{ display: 'none' }} />
-                      <span style={{ textDecoration: 'underline' }}>📎 Upload text file</span>
+                      <input type="file" onChange={handleFileUpload} accept=".txt,.md,.json,.csv,.log,.pdf,.docx,text/*,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style={{ display: 'none' }} />
+                      <span style={{ textDecoration: 'underline' }}>📎 Upload file (TXT, MD, PDF, DOCX)</span>
                       {fileName && <span style={{ marginLeft: 8, color: 'var(--accent)' }}>({fileName})</span>}
                     </label>
                   </div>
