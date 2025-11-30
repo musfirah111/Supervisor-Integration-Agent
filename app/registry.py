@@ -166,6 +166,21 @@ def load_registry() -> List[AgentMetadata]:
             healthcheck="https://hiring-screener-agent-sre.onrender.com/health",
             timeout_ms=30000,
         ),
+        # Document Reviewer Agent.
+        AgentMetadata(
+            name="document_reviewer_agent",
+            description="Reviews documents (.docx or text) for spelling, grammar, compliance issues, and generates structured feedback.",
+            intents=[
+                "document.review",
+                "document.review.spelling",
+                "document.review.grammar",
+                "document.review.compliance"
+            ],
+            type="http",
+            endpoint="https://document-reviewer-agent.onrender.com/handle",
+            healthcheck="https://document-reviewer-agent.onrender.com/health",
+            timeout_ms=60000,
+        ),
     ]
 
 
