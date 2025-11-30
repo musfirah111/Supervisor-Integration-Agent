@@ -4,6 +4,7 @@ capabilities and (b) look up connection details when calling a worker.
 """
 from __future__ import annotations
 
+import os
 from typing import List
 
 from .models import AgentMetadata
@@ -11,6 +12,7 @@ from .models import AgentMetadata
 
 def load_registry() -> List[AgentMetadata]:
     """Return the known worker agents. Replace endpoints/commands with real ones."""
+    
     return [
         AgentMetadata(
             name="progress_accountability_agent",
@@ -141,20 +143,30 @@ def load_registry() -> List[AgentMetadata]:
             healthcheck="https://budget-tracker-agent.onrender.com/api/health",
             timeout_ms=30000,  # Increased to 30s for Render.com cold starts (docs say 5000ms but that's too short for cold starts)
         ),
-           # Document Reviewer Agent.
         AgentMetadata(
-            name="document_reviewer_agent",
-            description="Reviews documents (.docx or text) for spelling, grammar, compliance issues, and generates structured feedback.",
+            name="hiring_screener_agent",
+            description=(
+                "AI-powered hiring assistant that parses resumes (PDF/DOCX), matches candidate skills against job requirements, "
+                "scores candidates using multi-factor analysis, ranks multiple applicants with statistical metrics, "
+                "detects potential bias in hiring decisions, and generates comprehensive hiring reports. "
+                "Supports semantic skill matching, experience evaluation, and batch candidate processing."
+            ),
             intents=[
-                "document.review",
-                "document.review.spelling",
-                "document.review.grammar",
-                "document.review.compliance"
+                "hiring.parse_resume",
+                "hiring.match_skills",
+                "hiring.score_candidate",
+                "hiring.rank_candidates",
+                "hiring.check_bias",
+                "hiring.generate_report",
+                "resume.parse",
+                "candidate.evaluate",
+                "candidate.score",
+                "candidate.rank",
             ],
             type="http",
-            endpoint="https://document-reviewer-agent.onrender.com/handle",
-            healthcheck="https://document-reviewer-agent.onrender.com/health",
-            timeout_ms=60000,
+            endpoint=f"https://hiring-screener-agent-sre.onrender.com/supervisor/task",
+            healthcheck="https://hiring-screener-agent-sre.onrender.com/health",
+            timeout_ms=30000,
         ),
     ]
 

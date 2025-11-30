@@ -504,7 +504,7 @@ def render_home() -> HTMLResponse:
             const [status, setStatus] = useState('');
             const [error, setError] = useState(null);
             const [openIntermediate, setOpenIntermediate] = useState(false);
-            const [fileName, setFileName] = useState('');
+            const [fileNames, setFileNames] = useState([]);
             const [uploadedFiles, setUploadedFiles] = useState([]);
             const chatRef = React.useRef(null);
             const fileInputRef = React.useRef(null);
@@ -541,7 +541,7 @@ def render_home() -> HTMLResponse:
               setUsedAgents([]);
               setIntermediate({});
               setError(null);
-              setFileName('');
+              setFileNames([]);
               setUploadedFiles([]);
             };
 
@@ -581,7 +581,7 @@ def render_home() -> HTMLResponse:
                 setError(data.error);
                 setMessages((prev) => [...prev, { role: 'assistant', content: data.answer || 'No answer produced.' }]);
                 setUploadedFiles([]);
-                setFileName('');
+                setFileNames([]);
               } catch (err) {
                 setStatus('');
                 setError({ message: 'Network error', type: 'network_error' });
@@ -590,78 +590,82 @@ def render_home() -> HTMLResponse:
             };
 
             const handleFileUpload = (e) => {
-              const file = e.target.files[0];
-              if (!file) return;
+              const files = Array.from(e.target.files);
+              if (files.length === 0) return;
               
-              setFileName(file.name);
-              setStatus('Reading file...');
+              const names = files.map(f => f.name);
+              setFileNames(names);
+              setStatus(`Reading ${files.length} file(s)...`);
               
-              const isTextFile = file.type.startsWith('text/') || 
-                                 file.name.endsWith('.txt') || 
-                                 file.name.endsWith('.md') || 
-                                 file.name.endsWith('.json') || 
-                                 file.name.endsWith('.csv') || 
-                                 file.name.endsWith('.log');
+              let processedFiles = [];
+              let textContent = '';
+              let filesProcessed = 0;
               
-              const isPDF = file.type === 'application/pdf' || file.name.endsWith('.pdf');
-              const isDOCX = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
-                            file.name.endsWith('.docx');
-              
-              const reader = new FileReader();
-              
-              reader.onerror = () => {
-                setStatus('');
-                setError({ message: 'Failed to read file', type: 'file_error' });
-                setFileName('');
-                setUploadedFiles([]);
+              const processFile = (file) => {
+                return new Promise((resolve, reject) => {
+                  const isTextFile = file.type.startsWith('text/') || 
+                                     file.name.endsWith('.txt') || 
+                                     file.name.endsWith('.md') || 
+                                     file.name.endsWith('.json') || 
+                                     file.name.endsWith('.csv') || 
+                                     file.name.endsWith('.log');
+                  
+                  const isPDF = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+                  const isDOCX = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+                                file.name.endsWith('.docx');
+                  
+                  const reader = new FileReader();
+                  
+                  reader.onerror = () => reject(new Error('Failed to read file'));
+                  
+                  if (isTextFile) {
+                    reader.onload = (event) => {
+                      textContent += `\n\n--- ${file.name} ---\n${event.target.result}`;
+                      resolve();
+                    };
+                    reader.readAsText(file);
+                  } else if (isPDF || isDOCX) {
+                    reader.onload = (event) => {
+                      const dataUrl = event.target.result;
+                      const base64 = dataUrl.split(',')[1];
+                      const mimeType = isPDF ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                      
+                      processedFiles.push({
+                        base64_data: base64,
+                        filename: file.name,
+                        mime_type: mimeType
+                      });
+                      resolve();
+                    };
+                    reader.readAsDataURL(file);
+                  } else {
+                    reject(new Error(`File type ${file.type || 'unknown'} not supported`));
+                  }
+                });
               };
               
-              if (isTextFile) {
-                reader.onload = (event) => {
-                  const fileContent = event.target.result;
-                  if (!input.trim() || input === 'Summarize our project status and flag any deadline risks.') {
-                    setInput(`Summarize this document:
-
-${fileContent}`);
-                  } else {
-                    setInput(`${input}
-
---- Document Content ---
-
-${fileContent}`);
-                  }
+              Promise.all(files.map(processFile))
+                .then(() => {
                   setStatus('');
+                  
+                  if (processedFiles.length > 0) {
+                    setUploadedFiles(processedFiles);
+                  } else if (textContent) {
+                    setUploadedFiles([]);
+                    const defaultPrompt = 'Summarize our project status and flag any deadline risks.';
+                    if (!input.trim() || input === defaultPrompt) {
+                      setInput(`Summarize these documents:${textContent}`);
+                    } else {
+                      setInput(`${input}${textContent}`);
+                    }
+                  }
+                })
+                .catch((err) => {
+                  setStatus('');
+                  setError({ message: err.message || 'Failed to process files', type: 'file_error' });
+                  setFileNames([]);
                   setUploadedFiles([]);
-                };
-                reader.readAsText(file);
-              } else if (isPDF || isDOCX) {
-                reader.onload = (event) => {
-                  const dataUrl = event.target.result;
-                  const base64 = dataUrl.split(',')[1];
-                  const mimeType = isPDF ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-                  
-                  setUploadedFiles([{
-                    base64_data: base64,
-                    filename: file.name,
-                    mime_type: mimeType
-                  }]);
-                  
-                  if (!input.trim() || input === 'Summarize our project status and flag any deadline risks.') {
-                    setInput('Summarize the attached document');
-                  } else if (!input.toLowerCase().includes('summarize') && !input.toLowerCase().includes('document')) {
-                    setInput(`${input}
-
-Summarize the attached document`);
-                  }
-                  setStatus('');
-                };
-                reader.readAsDataURL(file);
-              } else {
-                setStatus('');
-                setError({ message: `File type ${file.type || 'unknown'} not supported. Supported: text files, PDF, DOCX.`, type: 'file_error' });
-                setFileName('');
-                setUploadedFiles([]);
-              }
+                });
             };
 
             return (
@@ -701,9 +705,9 @@ Summarize the attached document`);
                     <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder="Type your message..." rows={3} />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <button className="primary" onClick={handleSend} style={{ padding: '12px 18px' }}>Send</button>
-                      <input ref={fileInputRef} type="file" style={{ display: 'none' }} accept=".txt,.md,.json,.csv,.log,.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileUpload} />
-                      <button type="button" className="file-trigger" onClick={() => fileInputRef.current && fileInputRef.current.click()}>Choose file</button>
-                      {fileName && <span className="file-meta">Attached: {fileName}</span>}
+                      <input ref={fileInputRef} type="file" style={{ display: 'none' }} accept=".txt,.md,.json,.csv,.log,.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={handleFileUpload} multiple />
+                      <button type="button" className="file-trigger" onClick={() => fileInputRef.current && fileInputRef.current.click()}>Choose file(s)</button>
+                      {fileNames.length > 0 && <span className="file-meta">Attached: {fileNames.join(', ')}</span>}
                     </div>
                   </div>
                   {error && <div className="small" style={{ color: '#f87171' }}>Error: {error.message}</div>}

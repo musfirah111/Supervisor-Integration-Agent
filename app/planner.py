@@ -498,6 +498,45 @@ def plan_tools_with_llm(query: str, registry: List[AgentMetadata], history: Opti
         )
     
     
+
+    
+    # Hiring/Resume operations - comprehensive keywords
+    if any(keyword in lower_q for keyword in [
+        "resume", "cv", "parse resume", "extract skills",
+        "candidate", "applicant", "job application",
+        "hire", "hiring", "recruit", "screening",
+        "match skill", "skill match", "evaluate candidate",
+        "score candidate", "rank candidate", "compare candidate",
+        "bias", "fairness", "discrimination",
+        "hiring report", "recruitment report"
+    ]):
+        # Determine specific intent based on query
+        if any(kw in lower_q for kw in ["parse", "extract", "cv", "resume text"]):
+            intent = "hiring.parse_resume"
+        elif any(kw in lower_q for kw in ["match", "skill", "requirement", "job description"]):
+            intent = "hiring.match_skills"
+        elif any(kw in lower_q for kw in ["score", "evaluate", "assess", "rate"]):
+            intent = "hiring.score_candidate"
+        elif any(kw in lower_q for kw in ["rank", "compare", "multiple candidate", "best candidate"]):
+            intent = "hiring.rank_candidates"
+        elif any(kw in lower_q for kw in ["bias", "fair", "discrimination", "equity"]):
+            intent = "hiring.check_bias"
+        elif any(kw in lower_q for kw in ["report", "summary", "analysis"]):
+            intent = "hiring.generate_report"
+        else:
+            intent = "hiring.match_skills"  # Default to skill matching
+        
+        return Plan(
+            steps=[
+                PlanStep(
+                    step_id=0,
+                    agent="hiring_screener_agent",
+                    intent=intent,
+                    input_source="user_query",
+                )
+            ]
+        )
+
     client = _get_openrouter_client()
     if client is None:
         # No LLM available and heuristics could not map the query: out of scope.
@@ -515,9 +554,16 @@ def plan_tools_with_llm(query: str, registry: List[AgentMetadata], history: Opti
         "If the request is outside the available agents\' scope, return {\"steps\":[]} (empty list) to signal out-of-scope. "
         "Strictly match agent intents to the user need; avoid generic summarizers unless summarization is explicitly requested. "
         "\n\nFor onboarding_buddy_agent:\n"
-        "- Use \'onboarding.create\' or \'employee.create\' for creating new employees\n"
-        "- Use \'onboarding.update\' or \'employee.update\' for updating employee information\n"
-        "- Use \'onboarding.check_progress\' or \'employee.check_status\' for checking employee status or profile completion"
+        "- Use 'onboarding.create' or 'employee.create' for creating new employees\n"
+        "- Use 'onboarding.update' or 'employee.update' for updating employee information\n"
+        "- Use 'onboarding.check_progress' or 'employee.check_status' for checking employee status or profile completion\n"
+        "\n\nFor hiring_screener_agent:\n"
+        "- Use 'hiring.parse_resume' for extracting structured data from resumes\n"
+        "- Use 'hiring.match_skills' for comparing candidate skills against job requirements\n"
+        "- Use 'hiring.score_candidate' for evaluating candidate fitness based on multiple factors\n"
+        "- Use 'hiring.rank_candidates' for ranking multiple candidates\n"
+        "- Use 'hiring.check_bias' for detecting potential bias in hiring decisions\n"
+        "- Use 'hiring.generate_report' for creating comprehensive hiring reports"
     )
     user_payload = {
         "user_query": query,
